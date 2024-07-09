@@ -312,7 +312,7 @@ void readTouchButtons() {
 }
 ```
 
-#### 🖼️ Ao final teremos algo assim:**
+## 🖼️ Ao final teremos algo assim:**
 ### Tela de Login
 ![Tela-Login](Tela-Login.png)
 
@@ -322,6 +322,6 @@ void readTouchButtons() {
 ### Tela de controle (Dispositivos ligados)
 ![Tela-Controle-On](Tela-Controle-On.png)
 
-#### 🗂️ Bibliotecas usadas
+## 🗂️ Bibliotecas usadas
 - 📁 [WiFi Versão 1.2.7](https://www.arduino.cc/reference/en/libraries/wifi/)
 - 📁 []()
