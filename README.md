@@ -5,11 +5,11 @@ Este é um projeto de automação residencial utilizando um ESP32, sensores DHT1
 ## Configuração Inicial
 
 ### Rede Wi-Fi
-Primeiro, configure o nome e a senha da rede Wi-Fi à qual o ESP32 se conectará:
+Inicialmente é necessário alterar o nome e senha da rede WiFi de acordo com a rede local a ser conectada, substituindo ``REPLACE_WITH_YOUR_SSID`` para o nome e ``REPLACE_WITH_YOUR_PASSWORD`` para a senha.
 
 ```cpp
-const char* ssid = "VIVOFIBRA-6969-EXT";
-const char* password = "Kx8mrWQByh";
+const char* ssid = "REPLACE_WITH_YOUR_SSID";
+const char* password = "REPLACE_WITH_YOUR_PASSWORD";
 ```
 
 ### Definição de Pinos
