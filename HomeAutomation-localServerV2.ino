@@ -1,63 +1,44 @@
-# Automação Residencial com ESP32 e Sensor DHT11 Via Servidor Local
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WebServer.h>
+#include <WebSocketsServer.h>
+#include <Preferences.h>
+#include <DHT.h>
+#include <Ticker.h>
 
-Este é um projeto de automação residencial utilizando um ESP32, sensores DHT11 para monitoramento de temperatura e umidade, e controle de dispositivos eletrônicos via um servidor web local. Este projeto permite o controle de dispositivos através de uma interface web, acessível por dispositivos conectados à mesma rede Wi-Fi.
-
-## Configuração Inicial
-
-### Rede Wi-Fi
-Primeiro, configure o nome e a senha da rede Wi-Fi à qual o ESP32 se conectará:
-
-```cpp
-const char* ssid = "VIVOFIBRA-6969-EXT";
-const char* password = "Kx8mrWQByh";
-```
-
-### Definição de Pinos
-Defina os pinos utilizados para os dispositivos e botões táteis:
-
-```cpp
 #define DHTPIN 27
 #define DHTTYPE DHT11
+
+DHT dht(DHTPIN, DHTTYPE);
+Ticker sensorTicker;
+
+const char* ssid = "REPLACE_WITH_YOUR_SSID";
+const char* password = "REPLACE_WITH_YOUR_PASSWORD";
+
+WebServer server(80);
+WebSocketsServer webSocket(81);
 
 const int numDevices = 4;
 const int numTouchButtons = 3;
 
 const int devicePins[numDevices] = { 18, 19, 23, 5 };
 const int touchButtonPins[numTouchButtons] = { 13, 12, 14 };
-```
 
-### Estado Inicial dos Dispositivos
-Configure o estado inicial dos dispositivos e os valores medianos dos botões táteis:
-
-```cpp
 bool deviceStates[numDevices] = { LOW, LOW, LOW, LOW };
 bool lastTouchStates[numTouchButtons] = { LOW, LOW, LOW };
 
 const int capacitanceThreshold = 20;
 int touchMedians[numTouchButtons] = { 0, 0, 0 };
-```
 
-### Credenciais de Login
-Defina as credenciais padrão para acesso à interface web:
+Preferences preferences;
 
-```cpp
 bool loggedIn = false;
 const char* defaultUsername = "admin";
 const char* defaultPassword = "admin";
-```
 
-### Variáveis de Sensor
-Inicialize as variáveis para armazenar os dados do sensor de temperatura e umidade:
-
-```cpp
 float currentTemperature = 0.0;
 float currentHumidity = 0.0;
-```
 
-## Código HTML da Interface Web
-
-### Página Principal
-```cpp
 const char HTML_PAGE[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
@@ -113,10 +94,7 @@ function toggleDevice(index) {
 </body>
 </html>
 )rawliteral";
-```
 
-### Página de Login
-```cpp
 const char LOGIN_PAGE[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
@@ -147,14 +125,7 @@ input[type=submit]:hover { background-color: #45a049; }
 </body>
 </html>
 )rawliteral";
-```
 
-## Funções de Configuração
-
-### Setup
-A função `setup` é responsável por inicializar os componentes do sistema, incluindo sensores, dispositivos e a conexão Wi-Fi.
-
-```cpp
 void setup() {
   Serial.begin(115200);
   dht.begin();
@@ -164,25 +135,13 @@ void setup() {
   setupServer();
   sensorTicker.attach(1, updateSensorData);
 }
-```
 
-### Loop
-A função `loop` mantém o servidor web e o servidor de WebSocket em execução contínua, além de ler os botões táteis.
-
-```cpp
 void loop() {
   server.handleClient();
   webSocket.loop();
   readTouchButtons();
 }
-```
 
-## Funções Auxiliares
-
-### Atualização de Dados do Sensor
-Esta função lê os dados do sensor DHT11 e os armazena nas variáveis apropriadas.
-
-```cpp
 void updateSensorData() {
   currentTemperature = dht.readTemperature();
   currentHumidity = dht.readHumidity();
@@ -197,12 +156,7 @@ void updateSensorData() {
     notifyClients();
   }
 }
-```
 
-### Configuração de Dispositivos
-Configura os pinos dos dispositivos e restaura o estado salvo dos dispositivos.
-
-```cpp
 void setupDevices() {
   for (int i = 0; i < numDevices; i++) {
     pinMode(devicePins[i], OUTPUT);
@@ -216,23 +170,13 @@ void setupDevices() {
     digitalWrite(devicePins[i], deviceStates[i] ? LOW : HIGH);
   }
 }
-```
 
-### Configuração dos Botões Táteis
-Configura os pinos dos botões táteis e calcula os valores medianos.
-
-```cpp
 void setupTouchButtons() {
   for (int i = 0; i < numTouchButtons; i++) {
     touchMedians[i] = getTouchMedian(touchButtonPins[i]);
   }
 }
-```
 
-### Conexão Wi-Fi
-Conecta o ESP32 à rede Wi-Fi especificada.
-
-```cpp
 void setupWiFi() {
   WiFi.begin(ssid, password);
   Serial.print("Conectando a ");
@@ -240,88 +184,119 @@ void setupWiFi() {
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-
-
     Serial.print(".");
   }
 
   Serial.println("");
-  Serial.println("Conectado à rede Wi-Fi");
-  Serial.print("Endereço IP: ");
+  Serial.println("WiFi conectado.");
+  Serial.println("Endereço IP: ");
   Serial.println(WiFi.localIP());
 }
-```
 
-### Servidor Web
-Configura o servidor web e o servidor de WebSocket.
-
-```cpp
 void setupServer() {
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (!loggedIn) {
-      request->send_P(200, "text/html", LOGIN_PAGE);
-    } else {
-      request->send_P(200, "text/html", HTML_PAGE, processor);
-    }
-  });
-
-  server.on("/login", HTTP_POST, [](AsyncWebServerRequest *request) {
-    if (request->hasParam("username", true) && request->hasParam("password", true)) {
-      String username = request->getParam("username", true)->value();
-      String password = request->getParam("password", true)->value();
-      if (username == defaultUsername && password == defaultPassword) {
-        loggedIn = true;
-        request->redirect("/");
-      } else {
-        request->redirect("/");
-      }
-    } else {
-      request->send(400, "text/plain", "Parâmetros inválidos");
-    }
-  });
-
-  server.on("/logout", HTTP_GET, [](AsyncWebServerRequest *request) {
-    loggedIn = false;
-    request->redirect("/");
-  });
-
+  server.on("/", handleRoot);
+  server.on("/login", HTTP_GET, handleLoginPage);
+  server.on("/login", HTTP_POST, handleLogin);
+  server.on("/logout", handleLogout);
+  server.onNotFound(handleNotFound);
   server.begin();
 
   webSocket.begin();
-  webSocket.onEvent(onWebSocketEvent);
+  webSocket.onEvent(webSocketEvent);
 }
-```
 
-### Leitura dos Botões Táteis
-Lê os valores dos botões táteis e alterna o estado dos dispositivos correspondentes.
+void handleRoot() {
+  if (!loggedIn) {
+    server.sendHeader("Location", "/login");
+    server.send(303);
+    return;
+  }
 
-```cpp
-void readTouchButtons() {
-  for (int i = 0; i < numTouchButtons; i++) {
-    int touchValue = touchRead(touchButtonPins[i]);
+  String html = String(HTML_PAGE);
+  html.replace("%TEMPERATURE%", String(currentTemperature, 1));
+  html.replace("%HUMIDITY%", String(currentHumidity, 1));
+  html.replace("%NUM_DEVICES%", String(numDevices));
 
-    if (touchValue < touchMedians[i] - capacitanceThreshold) {
-      if (!lastTouchStates[i]) {
-        lastTouchStates[i] = true;
-        toggleDevice(i);
-      }
-    } else {
-      lastTouchStates[i] = false;
+  String buttons = "";
+  for (int i = 0; i < numDevices; i++) {
+    String btnClass = deviceStates[i] ? "on" : "off";
+    buttons += "<div class=\"grid-item\"><button id=\"toggleBtn" + String(i) + "\" class=\"" + btnClass + "\" onclick=\"toggleDevice(" + String(i) + ")\">" + String(deviceStates[i] ? "Desligar" : "Ligar") + " Dispositivo " + String(i + 1) + "</button></div>";
+  }
+  html.replace("%BUTTONS%", buttons);
+
+  server.send(200, "text/html", html);
+}
+
+void handleLoginPage() {
+  server.send(200, "text/html", LOGIN_PAGE);
+}
+
+void handleLogin() {
+  if (server.hasArg("username") && server.hasArg("password")) {
+    String username = server.arg("username");
+    String password = server.arg("password");
+
+    if (username == defaultUsername && password == defaultPassword) {
+      loggedIn = true;
+      server.sendHeader("Location", "/");
+      server.send(303);
+      return;
+    }
+  }
+  server.send(401, "text/plain", "Login falhou!");
+}
+
+void handleLogout() {
+  loggedIn = false;
+  server.sendHeader("Location", "/login");
+  server.send(303);
+}
+
+void handleNotFound() {
+  server.send(404, "text/plain", "404 Not Found");
+}
+
+void notifyClients() {
+  String message = "{\"deviceStates\":[";
+  for (int i = 0; i < numDevices; i++) {
+    message += deviceStates[i] ? "true" : "false";
+    if (i < numDevices - 1) message += ",";
+  }
+  message += "],";
+  message += "\"temperature\":" + String(currentTemperature) + ",";
+  message += "\"humidity\":" + String(currentHumidity) + "}";
+  webSocket.broadcastTXT(message);
+}
+
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
+  if (type == WStype_TEXT) {
+    int index = atoi((char*)payload);
+    if (index >= 0 && index < numDevices) {
+      deviceStates[index] = !deviceStates[index];
+      digitalWrite(devicePins[index], deviceStates[index] ? LOW : HIGH);
+      preferences.putBool(String("device" + String(index)).c_str(), deviceStates[index]);
+      notifyClients();
     }
   }
 }
-```
 
-#### 🖼️ Ao final teremos algo assim:**
-### Tela de Login
-![Tela-Login](Tela-Login.png)
+int getTouchMedian(int pin) {
+  int sum = 0;
+  for (int i = 0; i < 100; i++) {
+    sum += touchRead(pin);
+  }
+  return sum / 100;
+}
 
-### Tela de controle (Dispositivos ligados)
-![Tela-Controle-Off](Tela-Controle-Off.png)
-
-### Tela de controle (Dispositivos ligados)
-![Tela-Controle-On](Tela-Controle-On.png)
-
-#### 🗂️ Bibliotecas usadas
-- 📁 [WiFi Versão 1.2.7](https://www.arduino.cc/reference/en/libraries/wifi/)
-- 📁 []()
+void readTouchButtons() {
+  for (int i = 0; i < numTouchButtons; i++) {
+    int touchValue = touchRead(touchButtonPins[i]);
+    if (touchValue < touchMedians[i] - capacitanceThreshold && lastTouchStates[i] == HIGH) {
+      deviceStates[i] = !deviceStates[i];
+      digitalWrite(devicePins[i], deviceStates[i] ? LOW : HIGH);
+      preferences.putBool(String("device" + String(i)).c_str(), deviceStates[i]);
+      notifyClients();
+    }
+    lastTouchStates[i] = (touchValue < touchMedians[i] - capacitanceThreshold) ? LOW : HIGH;
+  }
+}
