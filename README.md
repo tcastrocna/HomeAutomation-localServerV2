@@ -312,7 +312,7 @@ void readTouchButtons() {
 }
 ```
 
-## 🖼️ Ao final teremos algo assim:**
+## 🖼️ Ao final teremos algo assim:
 ### Tela de Login
 ![Tela-Login](Tela-Login.png)
 
